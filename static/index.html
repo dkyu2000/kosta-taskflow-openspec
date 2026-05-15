@@ -8,127 +8,272 @@
   <style>
     .hidden { display: none !important; }
     [draggable] { cursor: grab; }
-    .drop-zone { min-height: 120px; }
+    [draggable]:active { cursor: grabbing; }
+    .col-drop-target { outline: 2px dashed #3b82f6; background-color: #eff6ff !important; }
+    .screen-full { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans">
+<body class="bg-gray-50 font-sans antialiased">
 
-<!-- ── 로그인/회원가입 화면 ── -->
-<div id="screen-auth" class="screen flex items-center justify-center min-h-screen">
-  <div class="bg-white p-8 rounded-xl shadow-md w-full max-w-sm">
-    <h1 class="text-2xl font-bold text-teal-600 text-center mb-6">TaskFlow</h1>
+<!-- ═══ 인증 화면 ═══ -->
+<div id="screen-auth" class="screen hidden flex items-center justify-center min-h-screen p-4 bg-gray-50">
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm p-8">
+    <div class="flex justify-center mb-5">
+      <div class="bg-teal-500 text-white font-bold text-lg px-5 py-1.5 rounded-xl tracking-tight">TaskFlow</div>
+    </div>
+    <h2 id="auth-title" class="text-xl font-bold text-gray-800 text-center mb-6">로그인</h2>
     <div class="space-y-3">
-      <input id="auth-email" type="email" placeholder="이메일"
-        class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
-      <input id="auth-password" type="password" placeholder="비밀번호 (8자 이상)"
-        class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
-      <p id="auth-msg" class="text-sm text-red-500"></p>
-      <button id="btn-login"
-        class="w-full bg-teal-500 text-white py-2 rounded-lg font-semibold hover:bg-teal-600">로그인</button>
-      <button id="btn-signup"
-        class="w-full bg-gray-100 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-200">회원가입</button>
+      <div>
+        <input id="auth-email" type="email" placeholder="이메일 입력"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 transition" />
+        <p id="email-err" class="hidden text-xs text-red-500 mt-1">⚠ <span id="email-err-text"></span></p>
+      </div>
+      <div>
+        <input id="auth-password" type="password" placeholder="비밀번호 (8자 이상)"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 transition" />
+        <p id="pw-err" class="hidden text-xs text-red-500 mt-1">⚠ <span id="pw-err-text"></span></p>
+      </div>
+      <div id="auth-banner" class="hidden rounded-lg px-3 py-2.5 text-sm font-medium border"></div>
+      <button id="btn-auth-submit"
+        class="w-full bg-teal-500 text-white py-2.5 rounded-lg font-semibold hover:bg-teal-600 transition disabled:opacity-60 disabled:cursor-not-allowed">
+        로그인
+      </button>
+      <p class="text-center text-sm text-gray-500">
+        <span id="auth-switch-label">계정이 없으신가요?</span>
+        <button id="btn-auth-switch" class="ml-1 text-teal-600 font-semibold hover:underline">회원가입</button>
+      </p>
     </div>
   </div>
 </div>
 
-<!-- ── 팀 선택 화면 ── -->
-<div id="screen-teams" class="screen hidden">
-  <div class="max-w-2xl mx-auto p-6">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-teal-600">TaskFlow — 내 팀</h1>
-      <button id="btn-logout" class="text-sm text-gray-400 hover:text-red-400">로그아웃</button>
+<!-- ═══ 팀 선택 화면 ═══ -->
+<div id="screen-teams" class="screen hidden min-h-screen">
+  <header class="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between">
+    <div class="bg-teal-500 text-white font-bold px-4 py-1 rounded-lg text-sm">TaskFlow</div>
+    <div class="flex items-center gap-3 text-sm">
+      <span id="teams-user-email" class="font-medium text-gray-700"></span>
+      <span class="text-gray-300">|</span>
+      <button id="btn-teams-logout" class="text-gray-400 hover:text-red-500 transition">로그아웃</button>
     </div>
-
+  </header>
+  <div class="max-w-2xl mx-auto px-6 py-8">
+    <div id="no-team-banner" class="hidden mb-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
+      <span>ℹ</span><span>아직 팀에 소속되지 않았습니다. 팀을 만들거나 초대코드로 합류하세요.</span>
+    </div>
     <div id="team-list" class="space-y-2 mb-6"></div>
 
-    <div class="bg-white p-4 rounded-xl shadow-sm border space-y-3">
-      <h2 class="font-semibold text-gray-700">팀 만들기</h2>
-      <div class="flex gap-2">
-        <input id="team-name-input" type="text" placeholder="팀 이름"
-          class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+    <!-- 팀 생성 성공 카드 -->
+    <div id="team-created-card" class="hidden mb-6 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+      <div class="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-700 font-medium mb-4 flex items-center gap-2">
+        <span>✓</span><span>팀이 생성되었습니다!</span>
+      </div>
+      <p class="text-xs text-gray-500 mb-1">팀 이름</p>
+      <p id="created-team-name" class="text-xl font-bold text-gray-800 mb-4"></p>
+      <p class="text-xs text-gray-500 mb-2">초대코드 (멤버에게 공유)</p>
+      <div class="flex items-center gap-2 mb-5">
+        <div class="flex-1 bg-gray-50 border-2 border-teal-400 rounded-xl px-4 py-3 text-center">
+          <span id="created-team-code" class="text-2xl font-bold text-teal-600 tracking-widest font-mono"></span>
+        </div>
+        <button id="btn-copy-code" class="px-3 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-600 transition" title="복사">📋</button>
+      </div>
+      <button id="btn-go-kanban-from-create"
+        class="w-full bg-teal-500 text-white py-2.5 rounded-xl font-semibold hover:bg-teal-600 transition">
+        칸반 시작하기 →
+      </button>
+    </div>
+
+    <!-- 팀 합류 확인 카드 -->
+    <div id="team-joined-card" class="hidden mb-6 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+      <div id="joined-confirm-text" class="bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5 text-sm text-teal-700 font-medium mb-4"></div>
+      <div class="bg-gray-50 rounded-lg px-4 py-3 mb-4">
+        <p class="text-xs text-gray-500 mb-0.5">팀 정보 (미리보기)</p>
+        <p id="joined-team-name" class="font-bold text-gray-800"></p>
+      </div>
+      <button id="btn-go-kanban-from-join"
+        class="w-full bg-teal-500 text-white py-2.5 rounded-xl font-semibold hover:bg-teal-600 transition">
+        이 팀에 합류 →
+      </button>
+    </div>
+
+    <!-- 만들기/합류 패널 -->
+    <div id="team-action-panels" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="border-2 border-dashed border-gray-200 rounded-xl p-5 space-y-3">
+        <p class="font-semibold text-gray-700 text-center text-sm">+ 새 팀 만들기</p>
+        <input id="team-name-input" type="text" placeholder="팀 이름 (1–30자)"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
         <button id="btn-create-team"
-          class="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600">생성</button>
+          class="w-full bg-teal-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-teal-600 transition">만들기</button>
+        <p id="create-team-err" class="hidden text-xs text-red-500 text-center"></p>
       </div>
-      <h2 class="font-semibold text-gray-700">초대코드로 합류</h2>
-      <div class="flex gap-2">
-        <input id="invite-code-input" type="text" placeholder="XXXX-XXXX"
-          class="flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-400" />
+      <div class="border-2 border-dashed border-gray-200 rounded-xl p-5 space-y-3">
+        <p class="font-semibold text-gray-700 text-center text-sm">초대코드로 합류</p>
+        <input id="invite-code-input" type="text" placeholder="ABCD-1234"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-teal-400" />
         <button id="btn-join-team"
-          class="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-600">합류</button>
+          class="w-full bg-teal-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-teal-600 transition">합류</button>
+        <p id="join-team-err" class="hidden text-xs text-red-500 text-center"></p>
       </div>
-      <p id="teams-msg" class="text-sm text-red-500"></p>
     </div>
   </div>
 </div>
 
-<!-- ── 칸반 화면 ── -->
-<div id="screen-kanban" class="screen hidden">
-  <div class="max-w-5xl mx-auto p-6">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <button id="btn-kanban-back" class="text-gray-400 hover:text-gray-600 text-sm">← 팀 목록</button>
-        <h1 class="text-xl font-bold text-gray-800" id="kanban-team-name"></h1>
-      </div>
-      <button id="btn-kanban-to-chat"
-        class="px-3 py-1.5 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600">채팅 열기</button>
+<!-- ═══ 칸반 화면 ═══ -->
+<div id="screen-kanban" class="screen hidden screen-full">
+  <header class="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="bg-teal-500 text-white font-bold px-3 py-1 rounded-lg text-sm">TaskFlow</div>
+      <span id="kanban-team-name" class="font-semibold text-gray-700 text-sm"></span>
     </div>
-
-    <div class="flex gap-2 mb-4">
-      <input id="task-input" type="text" placeholder="새 태스크 제목"
-        class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
-      <button id="btn-add-task"
-        class="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600">추가</button>
+    <div class="flex rounded-lg overflow-hidden border border-gray-200 text-sm">
+      <button onclick="setTab('kanban')" id="ktab-kanban" class="px-4 py-1.5 bg-teal-500 text-white font-medium">칸반</button>
+      <button onclick="setTab('chat')" id="ktab-chat" class="px-4 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200 transition">채팅</button>
+      <button onclick="setTab('members')" id="ktab-members" class="px-4 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200 transition">멤버</button>
     </div>
-    <p id="kanban-msg" class="text-sm text-red-500 mb-2"></p>
-
-    <div class="grid grid-cols-3 gap-4">
+    <div class="flex items-center gap-3 text-sm">
+      <span id="kanban-user-email" class="text-gray-600 text-xs"></span>
+      <button id="btn-kanban-logout" class="text-gray-400 hover:text-red-400 text-xs transition">로그아웃</button>
+    </div>
+  </header>
+  <!-- 필터 바 -->
+  <div class="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-2 flex-shrink-0">
+    <button id="filter-all" onclick="setFilter('all')"
+      class="px-3 py-1 text-sm rounded-md bg-gray-800 text-white font-medium transition">전체</button>
+    <button id="filter-me" onclick="setFilter('me')"
+      class="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-gray-100 transition">@me</button>
+    <button id="filter-unassigned" onclick="setFilter('unassigned')"
+      class="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-gray-100 transition">미할당</button>
+    <span class="flex-1"></span>
+    <span class="text-xs text-gray-400">정렬: 최근 생성순</span>
+  </div>
+  <!-- 칸반 보드 -->
+  <div class="flex-1 overflow-auto p-6">
+    <div class="grid grid-cols-3 gap-4" style="min-height:100%">
       <!-- TODO -->
-      <div class="bg-gray-100 rounded-xl p-3">
-        <h2 class="font-bold text-gray-600 mb-3 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>TODO
-        </h2>
-        <div id="col-TODO" class="drop-zone space-y-2"></div>
+      <div class="flex flex-col rounded-xl overflow-hidden border border-amber-200 bg-amber-50">
+        <div class="px-3 py-2.5 flex items-center justify-between border-b border-amber-200">
+          <span id="hdr-TODO" class="text-sm font-bold text-amber-700">TODO · 0</span>
+          <button onclick="startInlineAdd('TODO')" class="text-amber-600 hover:bg-amber-100 w-6 h-6 rounded flex items-center justify-center text-xl leading-none transition">+</button>
+        </div>
+        <div id="col-TODO" class="flex-1 p-2 space-y-2 overflow-y-auto min-h-32"></div>
       </div>
       <!-- DOING -->
-      <div class="bg-blue-50 rounded-xl p-3">
-        <h2 class="font-bold text-blue-600 mb-3 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>DOING
-        </h2>
-        <div id="col-DOING" class="drop-zone space-y-2"></div>
+      <div class="flex flex-col rounded-xl overflow-hidden border border-blue-200 bg-blue-50">
+        <div class="px-3 py-2.5 flex items-center justify-between border-b border-blue-200">
+          <span id="hdr-DOING" class="text-sm font-bold text-blue-700">DOING · 0</span>
+          <button onclick="startInlineAdd('DOING')" class="text-blue-600 hover:bg-blue-100 w-6 h-6 rounded flex items-center justify-center text-xl leading-none transition">+</button>
+        </div>
+        <div id="col-DOING" class="flex-1 p-2 space-y-2 overflow-y-auto min-h-32"></div>
       </div>
       <!-- DONE -->
-      <div class="bg-green-50 rounded-xl p-3">
-        <h2 class="font-bold text-green-600 mb-3 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-green-400 inline-block"></span>DONE
-        </h2>
-        <div id="col-DONE" class="drop-zone space-y-2"></div>
+      <div class="flex flex-col rounded-xl overflow-hidden border border-green-200 bg-green-50">
+        <div class="px-3 py-2.5 flex items-center justify-between border-b border-green-200">
+          <span id="hdr-DONE" class="text-sm font-bold text-green-700">DONE · 0</span>
+          <button onclick="startInlineAdd('DONE')" class="text-green-600 hover:bg-green-100 w-6 h-6 rounded flex items-center justify-center text-xl leading-none transition">+</button>
+        </div>
+        <div id="col-DONE" class="flex-1 p-2 space-y-2 overflow-y-auto min-h-32"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ── 채팅 화면 ── -->
-<div id="screen-chat" class="screen hidden">
-  <div class="max-w-2xl mx-auto p-6 flex flex-col h-screen">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <button id="btn-chat-back" class="text-gray-400 hover:text-gray-600 text-sm">← 팀 목록</button>
-        <h1 class="text-xl font-bold text-gray-800" id="chat-team-name"></h1>
+<!-- ═══ 채팅 화면 ═══ -->
+<div id="screen-chat" class="screen hidden screen-full">
+  <header class="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="bg-teal-500 text-white font-bold px-3 py-1 rounded-lg text-sm">TaskFlow</div>
+      <span id="chat-team-label" class="font-semibold text-gray-700 text-sm"></span>
+    </div>
+    <div class="flex rounded-lg overflow-hidden border border-gray-200 text-sm">
+      <button onclick="setTab('kanban')" class="px-4 py-1.5 text-gray-600 hover:bg-gray-50 transition">칸반</button>
+      <button onclick="setTab('chat')" class="px-4 py-1.5 bg-teal-500 text-white font-medium border-l border-gray-200">채팅</button>
+      <button onclick="setTab('members')" class="px-4 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200 transition">멤버</button>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+      <span id="poll-badge" class="flex items-center gap-1 text-gray-400">
+        <span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse"></span>5초마다 새로고침
+      </span>
+      <span id="offline-badge" class="hidden items-center gap-1 text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+        ⚠ 연결 끊김 · 재시도 중
+      </span>
+    </div>
+  </header>
+  <div id="message-list" class="flex-1 overflow-y-auto px-6 py-4 space-y-1 bg-gray-50"></div>
+  <div class="bg-white border-t border-gray-100 px-6 py-4 flex-shrink-0">
+    <div class="flex items-end gap-3">
+      <div class="flex-1">
+        <textarea id="chat-input" placeholder="메시지 입력 (1000자 이내)..." rows="2"
+          class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 transition"></textarea>
+        <div class="flex justify-between items-center mt-1">
+          <p id="chat-err" class="text-xs text-red-500"></p>
+          <span id="chat-char-count" class="text-xs text-gray-400">0 / 1000</span>
+        </div>
       </div>
-      <button id="btn-chat-to-kanban"
-        class="px-3 py-1.5 text-sm bg-teal-500 text-white rounded-lg hover:bg-teal-600">칸반 열기</button>
-    </div>
-
-    <div id="message-list"
-      class="flex-1 overflow-y-auto bg-white border rounded-xl p-4 mb-3 space-y-1 min-h-0"></div>
-
-    <div class="flex gap-2">
-      <input id="chat-input" type="text" placeholder="메시지 입력 (Enter 전송)"
-        class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
       <button id="btn-send"
-        class="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600">전송</button>
+        class="px-5 py-3 bg-teal-500 text-white rounded-xl font-semibold hover:bg-teal-600 transition text-sm flex-shrink-0 disabled:opacity-60">
+        전송
+      </button>
     </div>
-    <p id="chat-msg" class="text-sm text-red-500 mt-1"></p>
+  </div>
+</div>
+
+<!-- ═══ 멤버 사이드패널 ═══ -->
+<div id="members-overlay" class="hidden fixed inset-0 z-40">
+  <div class="absolute inset-0 bg-black/30" onclick="closeMembersPanel()"></div>
+  <div class="absolute right-0 top-0 h-full w-80 bg-white shadow-xl flex flex-col z-10">
+    <div class="flex items-center justify-between px-5 py-4 border-b">
+      <div>
+        <h3 class="font-bold text-gray-800">팀 멤버</h3>
+        <p id="member-count" class="text-xs text-gray-400 mt-0.5"></p>
+      </div>
+      <button onclick="closeMembersPanel()" class="text-gray-400 hover:text-gray-600 text-xl w-8 h-8 flex items-center justify-center">✕</button>
+    </div>
+    <div id="member-list" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+  </div>
+</div>
+
+<!-- ═══ 카드 상세 모달 ═══ -->
+<div id="task-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/40" onclick="closeTaskModal()"></div>
+  <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 z-10">
+    <div class="flex items-start justify-between mb-5">
+      <div>
+        <span id="modal-task-id" class="text-xs font-mono text-gray-400 block mb-0.5"></span>
+        <h3 id="modal-task-title" class="font-bold text-gray-800 text-lg leading-snug"></h3>
+      </div>
+      <button onclick="closeTaskModal()" class="text-gray-400 hover:text-gray-600 text-xl w-8 h-8 flex items-center justify-center flex-shrink-0">✕</button>
+    </div>
+    <div class="space-y-4 mb-6">
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-gray-500 w-14 flex-shrink-0">상태</span>
+        <div class="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+          <button onclick="setModalStatus('TODO')" id="mbtn-TODO" class="px-3 py-2 text-gray-500 hover:bg-gray-50 transition">TODO</button>
+          <button onclick="setModalStatus('DOING')" id="mbtn-DOING" class="px-3 py-2 text-gray-500 hover:bg-gray-50 border-l border-gray-200 transition">DOING</button>
+          <button onclick="setModalStatus('DONE')" id="mbtn-DONE" class="px-3 py-2 text-gray-500 hover:bg-gray-50 border-l border-gray-200 transition">DONE</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-gray-500 w-14 flex-shrink-0">생성자</span>
+        <span id="modal-creator" class="text-sm text-gray-700"></span>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button id="btn-modal-save" class="flex-1 bg-teal-500 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-600 transition">저장</button>
+      <button id="btn-modal-delete" class="px-4 py-2.5 bg-red-50 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-100 border border-red-200 transition">🗑 삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 삭제 확인 모달 ═══ -->
+<div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/50" onclick="closeDeleteModal()"></div>
+  <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-8 z-10 text-center">
+    <div class="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
+    <h3 class="font-bold text-gray-800 text-lg mb-1">이 카드를 삭제하시겠습니까?</h3>
+    <p id="delete-subtitle" class="text-sm text-gray-500 mb-6"></p>
+    <div class="flex gap-3">
+      <button onclick="closeDeleteModal()" class="flex-1 border border-gray-200 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">취소</button>
+      <button id="btn-confirm-delete" class="flex-1 bg-red-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-red-600 transition">삭제</button>
+    </div>
   </div>
 </div>
 
