@@ -4,11 +4,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 
-from database import engine, Base
+from database import engine, Base, run_migrations
 import models  # noqa: ensure models are registered
 from routers import auth, teams, tasks, messages
 
 Base.metadata.create_all(bind=engine)
+run_migrations()
 
 app = FastAPI(title="TaskFlow MVP")
 

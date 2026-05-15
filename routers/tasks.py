@@ -1,6 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.orm import Session
 from database import get_db
 import models
@@ -19,6 +17,17 @@ def _require_member(db: Session, team_id: int, user_id: int):
         raise HTTPException(status_code=403, detail={"code": "NOT_MEMBER", "msg": "팀 멤버가 아닙니다"})
 
 
+def _task_to_dict(task: models.Task) -> dict:
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "status": task.status,
+        "creator_id": task.creator_id,
+        "assignee_id": task.assignee_id,
+        "created_at": task.created_at.isoformat() + "Z" if task.created_at else None,
+    }
+
+
 @router.post("/api/teams/{team_id}/tasks", status_code=201)
 def create_task(
     team_id: int,
@@ -31,12 +40,18 @@ def create_task(
     if not title:
         raise HTTPException(status_code=422, detail={"code": "MISSING_TITLE", "msg": "태스크 제목을 입력해주세요"})
 
-    task = models.Task(team_id=team_id, title=title, status="TODO", creator_id=current_user.id)
+    assignee_id = body.get("assignee_id")
+    task = models.Task(
+        team_id=team_id,
+        title=title,
+        status="TODO",
+        creator_id=current_user.id,
+        assignee_id=assignee_id,
+    )
     db.add(task)
     db.commit()
     db.refresh(task)
-
-    return {"task_id": task.id, "title": task.title, "status": task.status, "creator_id": task.creator_id}
+    return _task_to_dict(task)
 
 
 @router.get("/api/teams/{team_id}/tasks")
@@ -47,7 +62,7 @@ def list_tasks(
 ):
     _require_member(db, team_id, current_user.id)
     tasks = db.query(models.Task).filter(models.Task.team_id == team_id).all()
-    return [{"task_id": t.id, "title": t.title, "status": t.status, "creator_id": t.creator_id} for t in tasks]
+    return [_task_to_dict(t) for t in tasks]
 
 
 @router.get("/api/tasks/{task_id}")
@@ -60,7 +75,7 @@ def get_task(
     if not task:
         raise HTTPException(status_code=404, detail={"code": "TASK_NOT_FOUND", "msg": "태스크를 찾을 수 없습니다"})
     _require_member(db, task.team_id, current_user.id)
-    return {"task_id": task.id, "title": task.title, "status": task.status, "creator_id": task.creator_id}
+    return _task_to_dict(task)
 
 
 @router.put("/api/tasks/{task_id}")
@@ -89,9 +104,12 @@ def update_task(
             raise HTTPException(status_code=422, detail={"code": "MISSING_TITLE", "msg": "태스크 제목을 입력해주세요"})
         task.title = title
 
+    if "assignee_id" in body:
+        task.assignee_id = body["assignee_id"]
+
     db.commit()
     db.refresh(task)
-    return {"task_id": task.id, "title": task.title, "status": task.status, "creator_id": task.creator_id}
+    return _task_to_dict(task)
 
 
 @router.delete("/api/tasks/{task_id}")

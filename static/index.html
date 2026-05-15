@@ -6,11 +6,13 @@
   <title>TaskFlow</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .hidden { display: none !important; }
     [draggable] { cursor: grab; }
     [draggable]:active { cursor: grabbing; }
     .col-drop-target { outline: 2px dashed #3b82f6; background-color: #eff6ff !important; }
     .screen-full { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    /* .hidden must come AFTER .screen-full so JS-toggled hide wins over screen-full's display:flex,
+       but WITHOUT !important so Tailwind md:flex/md:hidden responsive classes can override it */
+    .hidden { display: none; }
   </style>
 </head>
 <body class="bg-gray-50 font-sans antialiased">
@@ -119,23 +121,35 @@
 
 <!-- ═══ 칸반 화면 ═══ -->
 <div id="screen-kanban" class="screen hidden screen-full">
-  <header class="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between flex-shrink-0">
-    <div class="flex items-center gap-3">
+  <header class="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-2">
+      <!-- 5.1: 모바일 햄버거 버튼 -->
+      <button onclick="openMobileMenu()" class="md:hidden p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg text-xl leading-none">☰</button>
       <div class="bg-teal-500 text-white font-bold px-3 py-1 rounded-lg text-sm">TaskFlow</div>
-      <span id="kanban-team-name" class="font-semibold text-gray-700 text-sm"></span>
+      <span id="kanban-team-name" class="font-semibold text-gray-700 text-sm hidden sm:block"></span>
     </div>
-    <div class="flex rounded-lg overflow-hidden border border-gray-200 text-sm">
+    <!-- 5.1: 탭 버튼 — 모바일에서 숨김 -->
+    <div class="hidden md:flex rounded-lg overflow-hidden border border-gray-200 text-sm">
       <button onclick="setTab('kanban')" id="ktab-kanban" class="px-4 py-1.5 bg-teal-500 text-white font-medium">칸반</button>
       <button onclick="setTab('chat')" id="ktab-chat" class="px-4 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200 transition">채팅</button>
       <button onclick="setTab('members')" id="ktab-members" class="px-4 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200 transition">멤버</button>
     </div>
     <div class="flex items-center gap-3 text-sm">
-      <span id="kanban-user-email" class="text-gray-600 text-xs"></span>
-      <button id="btn-kanban-logout" class="text-gray-400 hover:text-red-400 text-xs transition">로그아웃</button>
+      <span id="kanban-user-email" class="text-gray-600 text-xs hidden md:block"></span>
+      <button id="btn-kanban-logout" class="text-gray-400 hover:text-red-400 text-xs transition hidden md:block">로그아웃</button>
     </div>
   </header>
+  <!-- 5.3: 모바일 칸반 탭 인디케이터 -->
+  <div class="md:hidden flex bg-white border-b border-gray-100 flex-shrink-0">
+    <button id="mob-tab-TODO" onclick="setMobileKanbanTab('TODO')"
+      class="flex-1 py-2 text-sm font-semibold border-b-2 border-teal-500 text-teal-600 transition">TODO</button>
+    <button id="mob-tab-DOING" onclick="setMobileKanbanTab('DOING')"
+      class="flex-1 py-2 text-sm text-gray-500 border-b-2 border-transparent hover:text-gray-700 transition">DOING</button>
+    <button id="mob-tab-DONE" onclick="setMobileKanbanTab('DONE')"
+      class="flex-1 py-2 text-sm text-gray-500 border-b-2 border-transparent hover:text-gray-700 transition">DONE</button>
+  </div>
   <!-- 필터 바 -->
-  <div class="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-2 flex-shrink-0">
+  <div class="bg-white border-b border-gray-100 px-4 md:px-6 py-2 flex items-center gap-2 flex-shrink-0">
     <button id="filter-all" onclick="setFilter('all')"
       class="px-3 py-1 text-sm rounded-md bg-gray-800 text-white font-medium transition">전체</button>
     <button id="filter-me" onclick="setFilter('me')"
@@ -143,11 +157,11 @@
     <button id="filter-unassigned" onclick="setFilter('unassigned')"
       class="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-gray-100 transition">미할당</button>
     <span class="flex-1"></span>
-    <span class="text-xs text-gray-400">정렬: 최근 생성순</span>
+    <span class="text-xs text-gray-400 hidden sm:block">정렬: 최근 생성순</span>
   </div>
   <!-- 칸반 보드 -->
-  <div class="flex-1 overflow-auto p-6">
-    <div class="grid grid-cols-3 gap-4" style="min-height:100%">
+  <div class="flex-1 overflow-auto p-3 md:p-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" style="min-height:100%">
       <!-- TODO -->
       <div class="flex flex-col rounded-xl overflow-hidden border border-amber-200 bg-amber-50">
         <div class="px-3 py-2.5 flex items-center justify-between border-b border-amber-200">
@@ -178,12 +192,13 @@
 
 <!-- ═══ 채팅 화면 ═══ -->
 <div id="screen-chat" class="screen hidden screen-full">
-  <header class="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between flex-shrink-0">
-    <div class="flex items-center gap-3">
+  <header class="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-2">
+      <button onclick="openMobileMenu()" class="md:hidden p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg text-xl leading-none">☰</button>
       <div class="bg-teal-500 text-white font-bold px-3 py-1 rounded-lg text-sm">TaskFlow</div>
-      <span id="chat-team-label" class="font-semibold text-gray-700 text-sm"></span>
+      <span id="chat-team-label" class="font-semibold text-gray-700 text-sm hidden sm:block"></span>
     </div>
-    <div class="flex rounded-lg overflow-hidden border border-gray-200 text-sm">
+    <div class="hidden md:flex rounded-lg overflow-hidden border border-gray-200 text-sm">
       <button onclick="setTab('kanban')" class="px-4 py-1.5 text-gray-600 hover:bg-gray-50 transition">칸반</button>
       <button onclick="setTab('chat')" class="px-4 py-1.5 bg-teal-500 text-white font-medium border-l border-gray-200">채팅</button>
       <button onclick="setTab('members')" class="px-4 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200 transition">멤버</button>
@@ -255,6 +270,10 @@
         <span class="text-sm text-gray-500 w-14 flex-shrink-0">생성자</span>
         <span id="modal-creator" class="text-sm text-gray-700"></span>
       </div>
+      <div id="modal-created-at-row" class="hidden flex items-center gap-3">
+        <span class="text-sm text-gray-500 w-14 flex-shrink-0">생성 시각</span>
+        <span id="modal-created-at" class="text-sm text-gray-700 font-mono"></span>
+      </div>
     </div>
     <div class="flex gap-2">
       <button id="btn-modal-save" class="flex-1 bg-teal-500 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-600 transition">저장</button>
@@ -273,6 +292,33 @@
     <div class="flex gap-3">
       <button onclick="closeDeleteModal()" class="flex-1 border border-gray-200 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">취소</button>
       <button id="btn-confirm-delete" class="flex-1 bg-red-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-red-600 transition">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 모바일 슬라이드 메뉴 (5.2) ═══ -->
+<div id="mobile-menu" class="hidden fixed inset-0 z-50">
+  <div class="absolute inset-0 bg-black/40" onclick="closeMobileMenu()"></div>
+  <div class="absolute left-0 top-0 h-full w-72 bg-white shadow-xl flex flex-col z-10">
+    <div class="bg-teal-500 px-5 py-6 text-white">
+      <p id="mobile-menu-email" class="font-semibold text-sm truncate"></p>
+      <p id="mobile-menu-team" class="text-xs text-teal-100 mt-0.5 truncate"></p>
+    </div>
+    <nav class="flex-1 p-4 space-y-1">
+      <button id="mobile-menu-kanban" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-gray-50 transition text-left font-medium">
+        <span class="text-lg">📋</span> 칸반
+      </button>
+      <button id="mobile-menu-chat" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-gray-50 transition text-left font-medium">
+        <span class="text-lg">💬</span> 채팅
+      </button>
+      <button id="mobile-menu-members" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-gray-50 transition text-left font-medium">
+        <span class="text-lg">👥</span> 팀 멤버
+      </button>
+    </nav>
+    <div class="p-4 border-t border-gray-100">
+      <button id="mobile-menu-logout" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition text-left font-medium">
+        <span class="text-lg">🚪</span> 로그아웃
+      </button>
     </div>
   </div>
 </div>

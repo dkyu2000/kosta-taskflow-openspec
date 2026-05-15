@@ -30,7 +30,8 @@ let lastMessageTime = null;
 let currentModalTaskId = null;
 let currentModalStatus = null;
 let pendingDeleteTaskId = null;
-let activeScreen = 'kanban'; // 'kanban' | 'chat'
+let activeScreen = 'kanban';
+let mobileKanbanTab = 'TODO';
 
 // ── 화면 전환 ─────────────────────────────────────────────────
 function show(id) {
@@ -39,6 +40,7 @@ function show(id) {
 }
 
 function setTab(tab) {
+  closeMobileMenu();
   if (tab === 'members') { openMembersPanel(); return; }
   if (tab === 'kanban') {
     stopChatPoll();
@@ -121,13 +123,11 @@ document.getElementById('btn-auth-submit').addEventListener('click', async () =>
     localStorage.setItem('user_id', String(data.user_id));
     currentUserId = data.user_id;
     showAuthBanner('성공! 이동 중...', 'success');
-
     try {
       const me = await API.get('/api/auth/me');
       currentUserEmail = me.email;
       localStorage.setItem('user_email', me.email);
     } catch {}
-
     setTimeout(() => afterLogin(), 600);
   } catch (e) {
     btn.textContent = authMode === 'login' ? '로그인' : '가입하기';
@@ -144,11 +144,8 @@ document.getElementById('btn-auth-submit').addEventListener('click', async () =>
 
 async function afterLogin() {
   const teams = await API.get('/api/teams').catch(() => []);
-  if (teams.length > 0) {
-    enterKanban(teams[0].team_id, teams[0].name);
-  } else {
-    showTeamsScreen();
-  }
+  if (teams.length > 0) enterKanban(teams[0].team_id, teams[0].name);
+  else showTeamsScreen();
 }
 
 // ── 팀 화면 ─────────────────────────────────────────────────
@@ -165,7 +162,6 @@ async function loadTeamList() {
     const list = document.getElementById('team-list');
     list.innerHTML = '';
     document.getElementById('no-team-banner').classList.toggle('hidden', teams.length > 0);
-
     teams.forEach(t => {
       const div = document.createElement('div');
       div.className = 'flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:border-teal-200 transition';
@@ -283,10 +279,11 @@ async function loadTasks() {
   }
 }
 
+// 3.1 & 3.2: assignee_id 기반 필터
 function getFiltered(status) {
   let tasks = allTasks.filter(t => t.status === status);
-  if (currentFilter === 'me') tasks = tasks.filter(t => t.creator_id === currentUserId);
-  if (currentFilter === 'unassigned') tasks = tasks.filter(t => !t.creator_id);
+  if (currentFilter === 'me') tasks = tasks.filter(t => t.assignee_id === currentUserId);
+  if (currentFilter === 'unassigned') tasks = tasks.filter(t => !t.assignee_id);
   return tasks;
 }
 
@@ -312,6 +309,7 @@ function renderTasks() {
     }
   });
   setupDrop();
+  updateMobileKanbanTab(mobileKanbanTab);
 }
 
 function emailInitial(userId) {
@@ -320,18 +318,24 @@ function emailInitial(userId) {
   return m.email.split('@')[0];
 }
 
+// 3.3: assignee_id 기반 카드 레이블
 function makeCard(task) {
   const div = document.createElement('div');
   div.className = 'bg-white p-3 rounded-lg border border-gray-200 cursor-grab hover:shadow-sm hover:border-gray-300 transition select-none group';
   div.draggable = true;
   div.dataset.taskId = task.task_id;
-  const label = task.creator_id === currentUserId ? '@me' : `@${emailInitial(task.creator_id)}`;
+
+  let label;
+  if (task.assignee_id === currentUserId) label = '@me';
+  else if (task.assignee_id) label = `@${emailInitial(task.assignee_id)}`;
+  else label = '미할당';
+
   div.innerHTML = `
     <p class="text-sm text-gray-800 font-medium break-words leading-snug">${esc(task.title)}</p>
     <div class="flex items-center gap-1 mt-1.5">
       <span class="text-xs text-gray-400">#${task.task_id}</span>
       <span class="text-xs text-gray-300">·</span>
-      <span class="text-xs text-gray-400">${esc(label)}</span>
+      <span class="text-xs ${task.assignee_id ? 'text-gray-400' : 'text-gray-300 italic'}">${esc(label)}</span>
     </div>`;
   div.addEventListener('click', () => openTaskModal(task));
   div.addEventListener('dragstart', e => { e.dataTransfer.setData('taskId', String(task.task_id)); div.classList.add('opacity-40'); });
@@ -357,17 +361,32 @@ function setupDrop() {
   });
 }
 
+// 4.1 & 4.2: 인라인 담당자 선택 드롭다운 포함
 function startInlineAdd(status) {
   document.querySelector('.inline-add-form')?.remove();
   const col = document.getElementById(`col-${status}`);
   const form = document.createElement('div');
   form.className = 'inline-add-form bg-white border-2 border-teal-400 rounded-lg p-3 mb-2';
+
+  const memberOptions = teamMembers.map(m =>
+    `<option value="${m.user_id}" ${m.user_id === currentUserId ? 'selected' : ''}>${m.user_id === currentUserId ? '@me' : esc(m.email.split('@')[0])}</option>`
+  ).join('');
+
   form.innerHTML = `
     <input type="text" id="inline-input" placeholder="태스크 제목 입력..."
       class="w-full text-sm focus:outline-none mb-2 bg-transparent" />
-    <div class="flex items-center justify-between">
-      <span class="text-xs text-gray-400">Enter: 저장 · Esc: 취소</span>
-      <button id="btn-inline-cancel" class="text-xs text-gray-400 hover:text-gray-600">✕</button>
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-1 text-xs text-gray-500">
+        <span>담당자:</span>
+        <select id="inline-assignee" class="text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400">
+          <option value="">미할당</option>
+          ${memberOptions}
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-gray-400">Enter: 저장 · Esc: 취소</span>
+        <button id="btn-inline-cancel" class="text-xs text-gray-400 hover:text-gray-600">✕</button>
+      </div>
     </div>`;
   col.prepend(form);
   const input = document.getElementById('inline-input');
@@ -376,8 +395,11 @@ function startInlineAdd(status) {
     if (e.key === 'Enter') {
       const title = input.value.trim();
       if (!title) return;
+      const assigneeVal = document.getElementById('inline-assignee').value;
+      const body = { title };
+      if (assigneeVal) body.assignee_id = Number(assigneeVal);
       try {
-        await API.post(`/api/teams/${currentTeamId}/tasks`, { title });
+        await API.post(`/api/teams/${currentTeamId}/tasks`, body);
         form.remove();
         await loadTasks();
       } catch (err) { console.error(err); }
@@ -398,6 +420,7 @@ function setFilter(f) {
 }
 
 // ── 카드 상세 모달 ───────────────────────────────────────────
+// 3.4: created_at 표시 포함
 function openTaskModal(task) {
   currentModalTaskId = task.task_id;
   document.getElementById('modal-task-id').textContent = `#${task.task_id}`;
@@ -405,6 +428,17 @@ function openTaskModal(task) {
   const creatorLabel = task.creator_id === currentUserId
     ? `${currentUserEmail} (나)` : emailInitial(task.creator_id);
   document.getElementById('modal-creator').textContent = creatorLabel;
+
+  const createdAtRow = document.getElementById('modal-created-at-row');
+  if (task.created_at) {
+    const dt = new Date(task.created_at);
+    const fmt = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('modal-created-at').textContent = fmt;
+    createdAtRow.classList.remove('hidden');
+  } else {
+    createdAtRow.classList.add('hidden');
+  }
+
   setModalStatus(task.status);
   document.getElementById('task-modal').classList.remove('hidden');
 }
@@ -490,6 +524,70 @@ function openMembersPanel() {
 function closeMembersPanel() {
   document.getElementById('members-overlay').classList.add('hidden');
 }
+
+// ── 모바일 햄버거 메뉴 (5.4) ─────────────────────────────────
+function openMobileMenu() {
+  const panel = document.getElementById('mobile-menu');
+  if (!panel) return;
+  document.getElementById('mobile-menu-email').textContent = currentUserEmail;
+  document.getElementById('mobile-menu-team').textContent = currentTeamName;
+  panel.classList.remove('hidden');
+}
+
+function closeMobileMenu() {
+  document.getElementById('mobile-menu')?.classList.add('hidden');
+}
+
+document.getElementById('mobile-menu-kanban')?.addEventListener('click', () => setTab('kanban'));
+document.getElementById('mobile-menu-chat')?.addEventListener('click', () => setTab('chat'));
+document.getElementById('mobile-menu-members')?.addEventListener('click', () => { closeMobileMenu(); openMembersPanel(); });
+document.getElementById('mobile-menu-logout')?.addEventListener('click', logout);
+
+// ── 모바일 칸반 탭 (5.5) ─────────────────────────────────────
+function setMobileKanbanTab(tab) {
+  mobileKanbanTab = tab;
+  updateMobileKanbanTab(tab);
+}
+
+function updateMobileKanbanTab(tab) {
+  const isMobile = window.innerWidth < 768;
+  if (!isMobile) {
+    ['TODO', 'DOING', 'DONE'].forEach(s => {
+      document.getElementById(`col-${s}`)?.closest('.flex.flex-col.rounded-xl')?.classList.remove('hidden');
+    });
+    return;
+  }
+  ['TODO', 'DOING', 'DONE'].forEach(s => {
+    const wrapper = document.getElementById(`col-${s}`)?.closest('.flex.flex-col.rounded-xl');
+    if (wrapper) wrapper.classList.toggle('hidden', s !== tab);
+  });
+  ['TODO', 'DOING', 'DONE'].forEach(s => {
+    const btn = document.getElementById(`mob-tab-${s}`);
+    if (!btn) return;
+    btn.className = s === tab
+      ? 'flex-1 py-2 text-sm font-semibold border-b-2 border-teal-500 text-teal-600 transition'
+      : 'flex-1 py-2 text-sm text-gray-500 border-b-2 border-transparent hover:text-gray-700 transition';
+  });
+}
+
+// ── 모바일 스와이프 (5.6) ─────────────────────────────────────
+let touchStartX = 0;
+const TABS = ['TODO', 'DOING', 'DONE'];
+
+document.getElementById('screen-kanban')?.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+}, { passive: true });
+
+document.getElementById('screen-kanban')?.addEventListener('touchend', e => {
+  if (window.innerWidth >= 768) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) < 50) return;
+  const idx = TABS.indexOf(mobileKanbanTab);
+  if (dx < 0 && idx < TABS.length - 1) setMobileKanbanTab(TABS[idx + 1]);
+  else if (dx > 0 && idx > 0) setMobileKanbanTab(TABS[idx - 1]);
+}, { passive: true });
+
+window.addEventListener('resize', () => updateMobileKanbanTab(mobileKanbanTab));
 
 // ── 채팅 ─────────────────────────────────────────────────────
 async function loadMessages(reset = false) {
@@ -589,6 +687,19 @@ chatInput.addEventListener('keydown', e => {
 });
 document.getElementById('btn-send').addEventListener('click', sendMessage);
 
+// 5.7: visualViewport로 모바일 키보드 대응
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    const chatScreen = document.getElementById('screen-chat');
+    if (!chatScreen || chatScreen.classList.contains('hidden')) return;
+    if (window.innerWidth < 768) {
+      chatScreen.style.height = `${window.visualViewport.height}px`;
+    } else {
+      chatScreen.style.height = '';
+    }
+  });
+}
+
 async function sendMessage() {
   const content = chatInput.value.trim();
   const errEl = document.getElementById('chat-err');
@@ -647,11 +758,8 @@ async function init() {
   }
 
   const teams = await API.get('/api/teams').catch(() => []);
-  if (teams.length > 0) {
-    enterKanban(teams[0].team_id, teams[0].name);
-  } else {
-    showTeamsScreen();
-  }
+  if (teams.length > 0) enterKanban(teams[0].team_id, teams[0].name);
+  else showTeamsScreen();
 }
 
 init();

@@ -14,7 +14,7 @@ class User(Base):
 
     owned_teams = relationship("Team", back_populates="owner")
     memberships = relationship("TeamMember", back_populates="user")
-    tasks = relationship("Task", back_populates="creator")
+    tasks = relationship("Task", foreign_keys="Task.creator_id", back_populates="creator")
     messages = relationship("Message", back_populates="user")
 
 
@@ -51,9 +51,12 @@ class Task(Base):
     title = Column(String, nullable=False)
     status = Column(String, default="TODO", nullable=False)
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     team = relationship("Team", back_populates="tasks")
-    creator = relationship("User", back_populates="tasks")
+    creator = relationship("User", foreign_keys=[creator_id], back_populates="tasks")
+    assignee = relationship("User", foreign_keys=[assignee_id])
 
 
 class Message(Base):
