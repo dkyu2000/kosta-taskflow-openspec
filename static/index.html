@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .hidden { display: none !important; }
+    [draggable] { cursor: grab; }
+    .drop-zone { min-height: 120px; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+<!-- ── 로그인/회원가입 화면 ── -->
+<div id="screen-auth" class="screen flex items-center justify-center min-h-screen">
+  <div class="bg-white p-8 rounded-xl shadow-md w-full max-w-sm">
+    <h1 class="text-2xl font-bold text-teal-600 text-center mb-6">TaskFlow</h1>
+    <div class="space-y-3">
+      <input id="auth-email" type="email" placeholder="이메일"
+        class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+      <input id="auth-password" type="password" placeholder="비밀번호 (8자 이상)"
+        class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+      <p id="auth-msg" class="text-sm text-red-500"></p>
+      <button id="btn-login"
+        class="w-full bg-teal-500 text-white py-2 rounded-lg font-semibold hover:bg-teal-600">로그인</button>
+      <button id="btn-signup"
+        class="w-full bg-gray-100 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-200">회원가입</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 팀 선택 화면 ── -->
+<div id="screen-teams" class="screen hidden">
+  <div class="max-w-2xl mx-auto p-6">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-xl font-bold text-teal-600">TaskFlow — 내 팀</h1>
+      <button id="btn-logout" class="text-sm text-gray-400 hover:text-red-400">로그아웃</button>
+    </div>
+
+    <div id="team-list" class="space-y-2 mb-6"></div>
+
+    <div class="bg-white p-4 rounded-xl shadow-sm border space-y-3">
+      <h2 class="font-semibold text-gray-700">팀 만들기</h2>
+      <div class="flex gap-2">
+        <input id="team-name-input" type="text" placeholder="팀 이름"
+          class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+        <button id="btn-create-team"
+          class="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600">생성</button>
+      </div>
+      <h2 class="font-semibold text-gray-700">초대코드로 합류</h2>
+      <div class="flex gap-2">
+        <input id="invite-code-input" type="text" placeholder="XXXX-XXXX"
+          class="flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-400" />
+        <button id="btn-join-team"
+          class="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-600">합류</button>
+      </div>
+      <p id="teams-msg" class="text-sm text-red-500"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── 칸반 화면 ── -->
+<div id="screen-kanban" class="screen hidden">
+  <div class="max-w-5xl mx-auto p-6">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <button id="btn-kanban-back" class="text-gray-400 hover:text-gray-600 text-sm">← 팀 목록</button>
+        <h1 class="text-xl font-bold text-gray-800" id="kanban-team-name"></h1>
+      </div>
+      <button id="btn-kanban-to-chat"
+        class="px-3 py-1.5 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600">채팅 열기</button>
+    </div>
+
+    <div class="flex gap-2 mb-4">
+      <input id="task-input" type="text" placeholder="새 태스크 제목"
+        class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+      <button id="btn-add-task"
+        class="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600">추가</button>
+    </div>
+    <p id="kanban-msg" class="text-sm text-red-500 mb-2"></p>
+
+    <div class="grid grid-cols-3 gap-4">
+      <!-- TODO -->
+      <div class="bg-gray-100 rounded-xl p-3">
+        <h2 class="font-bold text-gray-600 mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>TODO
+        </h2>
+        <div id="col-TODO" class="drop-zone space-y-2"></div>
+      </div>
+      <!-- DOING -->
+      <div class="bg-blue-50 rounded-xl p-3">
+        <h2 class="font-bold text-blue-600 mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>DOING
+        </h2>
+        <div id="col-DOING" class="drop-zone space-y-2"></div>
+      </div>
+      <!-- DONE -->
+      <div class="bg-green-50 rounded-xl p-3">
+        <h2 class="font-bold text-green-600 mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-400 inline-block"></span>DONE
+        </h2>
+        <div id="col-DONE" class="drop-zone space-y-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 채팅 화면 ── -->
+<div id="screen-chat" class="screen hidden">
+  <div class="max-w-2xl mx-auto p-6 flex flex-col h-screen">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <button id="btn-chat-back" class="text-gray-400 hover:text-gray-600 text-sm">← 팀 목록</button>
+        <h1 class="text-xl font-bold text-gray-800" id="chat-team-name"></h1>
+      </div>
+      <button id="btn-chat-to-kanban"
+        class="px-3 py-1.5 text-sm bg-teal-500 text-white rounded-lg hover:bg-teal-600">칸반 열기</button>
+    </div>
+
+    <div id="message-list"
+      class="flex-1 overflow-y-auto bg-white border rounded-xl p-4 mb-3 space-y-1 min-h-0"></div>
+
+    <div class="flex gap-2">
+      <input id="chat-input" type="text" placeholder="메시지 입력 (Enter 전송)"
+        class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
+      <button id="btn-send"
+        class="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600">전송</button>
+    </div>
+    <p id="chat-msg" class="text-sm text-red-500 mt-1"></p>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
